@@ -29,7 +29,7 @@ avante-pricing/
 - **Estado:** ✅ Funcionando
 - **Plan:** Gratis (2,500 búsquedas)
 - **Uso:** Búsquedas en Google Shopping (mercado mexicano)
-- **Key:** 45ed37f93abc74050489d00928ff277707fe5b83
+- **Key:** [CONFIGURADA EN VARIABLES DE ENTORNO]
 
 #### 2. GEMINI_API_KEY
 - **Servicio:** https://aistudio.google.com/
@@ -37,7 +37,7 @@ avante-pricing/
 - **Plan:** Gratis
 - **Modelo:** gemini-2.0-flash
 - **Uso:** Análisis inteligente de resultados
-- **Key:** AIzaSyB_5zy_4tatzZl9a4rf9YMRUyoJNBqHigQ
+- **Key:** [CONFIGURADA EN VARIABLES DE ENTORNO]
 
 ### Cambios Realizados
 
