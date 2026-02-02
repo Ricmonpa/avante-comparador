@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 Avante Comparador - Análisis Masivo de Inventario
 
-## Getting Started
+Sistema inteligente de comparación de precios que analiza automáticamente todo tu inventario vs la competencia.
 
-First, run the development server:
+## ✨ Funcionalidades
+
+### 🔍 Análisis Masivo Automático
+- **Sube tu Excel** → Análisis automático de todos los productos
+- **Detección inteligente** de headers (funciona con cualquier formato)
+- **Comparación en tiempo real** con Google Shopping
+- **Clasificación automática**: Más caro 🔴 | Competitivo ✅ | Más barato 🟢
+
+### 📊 Tabla de Resultados Completa
+- Vista comparativa de tu precio vs mejor competencia
+- Filtros por estado de precio
+- Links directos para verificar competencia
+- Recomendaciones de acción automáticas
+- Exportación a Excel
+
+### 🎯 Buscador Individual
+- Búsquedas rápidas de productos específicos
+- Integración con inventario local
+- Comparación instantánea con competencia
+
+## 🛠️ Stack Técnico
+
+- **Framework:** Next.js 16.1.1 (App Router)
+- **Frontend:** React 19, TypeScript, Tailwind CSS
+- **APIs:** Serper.dev + Google Gemini AI
+- **Procesamiento:** xlsx, inventario en memoria
+
+## 🚀 Deployment en Vercel
+
+### 1. Variables de Entorno Requeridas
+
+En tu dashboard de Vercel, configura estas variables:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+SERPER_API_KEY=tu_llave_de_serper_aqui
+GEMINI_API_KEY=tu_llave_de_gemini_aqui
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Obtener API Keys (GRATIS)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+#### Serper API (Google Shopping)
+1. Ve a [serper.dev](https://serper.dev)
+2. Regístrate gratis
+3. Obtén tu API key (2,500 búsquedas gratis)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+#### Google Gemini AI
+1. Ve a [Google AI Studio](https://aistudio.google.com/)
+2. Regístrate gratis
+3. Crea una API key
 
-## Learn More
+### 3. Deploy Automático
 
-To learn more about Next.js, take a look at the following resources:
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Ricmonpa/avante-comparador)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+O manualmente:
+```bash
+npm i -g vercel
+vercel --prod
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📈 Rendimiento
 
-## Deploy on Vercel
+- **13 segundos** para analizar 7 productos completos
+- **Procesamiento paralelo** optimizado (máx 5 búsquedas simultáneas)
+- **Headers detectados automáticamente** en cualquier fila
+- **Búsquedas en tiempo real** con Google Shopping
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🎯 Casos de Uso
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Para Llantas Avante:
+- ✅ Identifica productos sobrepreciados que necesitas bajar
+- ✅ Encuentra productos competitivos que puedes mantener
+- ✅ Descubre productos subpreciados con oportunidad de alza
+- ✅ Ahorra horas de búsqueda manual producto por producto
+
+### Ejemplo de Análisis:
+```
+Michelin Primacy 4 205/55R16
+Tu precio: $2,200 vs Liverpool: $2,229 → Competitivo ✅
+
+Continental ContiPremiumContact 205/55R16  
+Tu precio: $2,100 vs Bodega Aurrera: $1,599 → Más caro 🔴 (Bajar precio)
+```
+
+## 🔒 Seguridad
+
+- ✅ API keys protegidas con variables de entorno
+- ✅ No se almacenan datos sensibles
+- ✅ Procesamiento en memoria temporal
+- ✅ HTTPS en todas las comunicaciones
+
+## 📱 Responsive Design
+
+- ✅ Optimizado para desktop y móvil
+- ✅ Drag & drop de archivos Excel
+- ✅ Tablas responsivas con scroll horizontal
+- ✅ UI moderna con Tailwind CSS
+
+## 🚀 Desarrollo Local
+
+```bash
+# Clonar repositorio
+git clone https://github.com/Ricmonpa/avante-comparador.git
+cd avante-comparador
+
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env.local
+# Editar .env.local con tus API keys
+
+# Iniciar servidor de desarrollo
+npm run dev
+```
+
+## 📊 Estructura del Proyecto
+
+```
+avante-comparador/
+├── app/
+│   ├── api/
+│   │   ├── bulk/
+│   │   │   ├── upload/route.ts    # Parser de Excel + análisis
+│   │   │   └── analyze/route.ts   # Análisis masivo
+│   │   └── scrape/route.ts        # Búsqueda individual
+│   ├── bulk/page.tsx              # Página de análisis masivo
+│   └── page.tsx                   # Página principal
+├── components/
+│   ├── BulkResultsTable.tsx       # Tabla de resultados
+│   └── ProgressBar.tsx            # Barra de progreso
+├── lib/
+│   └── inventory-store.ts         # Almacenamiento en memoria
+└── scripts/
+    └── generate_mock_data.js      # Generador de datos de prueba
+```
+
+## 🎉 Demo
+
+**URL de producción:** [Será generada por Vercel]
+
+**Funcionalidades de demo:**
+1. Sube el Excel de inventario
+2. Ve el análisis automático en tiempo real
+3. Explora la tabla de resultados con filtros
+4. Prueba el buscador individual
+
+---
+
+**Desarrollado para Llantas Avante** 🏪  
+*Análisis inteligente de competencia automatizado*
