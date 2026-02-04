@@ -11,7 +11,9 @@ async function processBatch(products: any[], batchSize: number = 5) {
       batch.map(async (product) => {
         try {
           const query = `${product.brand} ${product.model} ${product.size}`;
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/scrape?q=${encodeURIComponent(query)}`);
+          // Usar la URL base correcta de Vercel
+          const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://avante-comparador.vercel.app';
+          const response = await fetch(`${baseUrl}/api/scrape?q=${encodeURIComponent(query)}`);
           const data = await response.json();
           
           if (!data.success) {
