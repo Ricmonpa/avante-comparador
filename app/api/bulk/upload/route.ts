@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     console.log(`🚀 Iniciando análisis masivo automático...`);
     
     try {
-      const analyzeResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/bulk/analyze`, {
+      const analyzeResponse = await fetch(`https://avante-comparador.vercel.app/api/bulk/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products: normalizedData })
