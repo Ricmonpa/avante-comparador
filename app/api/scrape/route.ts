@@ -75,17 +75,29 @@ export async function GET(request: Request) {
       1. Identifica el producto de "Grupo Avante" o "Avante" (si existe).
       2. Identifica el mejor competidor (el más barato que NO sea Avante).
       3. Extrae las medidas de la llanta (ej: 205/55 R16).
+      4. Para el competidor elegido, incluye el campo "link" exactamente como viene en la lista (URL del producto en la tienda).
 
       Responde ÚNICAMENTE en formato JSON con esta estructura:
       {
         "specs": "medida encontrada",
         "avante": {"found": true/false, "price": número, "title": "título"},
-        "competitor": {"vendor": "nombre tienda", "price": número, "title": "título"}
+        "competitor": {"vendor": "nombre tienda", "price": número, "title": "título", "link": "url del producto"}
       }
     `;
 
     const result = await model.generateContent(prompt);
     const responseIA = JSON.parse(result.response.text().replace(/```json|```/g, ""));
+
+    // Fallback: si Gemini no devolvió link, buscarlo en los resultados de Serper
+    let competitorLink = responseIA.competitor?.link;
+    if (!competitorLink && responseIA.competitor) {
+      const match = allResults.find(
+        (r: { link?: string; productLink?: string; source?: string; title?: string; price?: number }) =>
+          (r.source === responseIA.competitor.vendor || (r.title && responseIA.competitor.title && String(r.title).includes(String(responseIA.competitor.title).slice(0, 30)))) &&
+          (r.link || r.productLink)
+      );
+      competitorLink = match?.link || (match as { productLink?: string })?.productLink || null;
+    }
 
     // 3. RESPUESTA FINAL - Priorizar inventario local sobre Google Shopping
     const finalAvanteData = avanteProduct ? {
@@ -112,7 +124,8 @@ export async function GET(request: Request) {
         competitor: {
           vendor: responseIA.competitor?.vendor,
           price: responseIA.competitor?.price,
-          title: responseIA.competitor?.title
+          title: responseIA.competitor?.title,
+          link: competitorLink || null
         },
         currency: 'MXN',
         localInventoryChecked: true,

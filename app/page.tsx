@@ -188,74 +188,90 @@ export default function Home() {
             </div>
           </div>
 
-          {/* CARD 2: COMPETENCIA (DETECTADO) */}
-          <div className={`rounded-3xl p-8 border relative overflow-hidden flex flex-col justify-between h-full transition-colors duration-500 ${
-            !result.data.avante.found ? 'bg-slate-900 border-slate-700' :
-            result.data.competitor.price < result.data.avante.price 
-              ? 'bg-red-950/20 border-red-900/50' 
-              : 'bg-green-950/20 border-green-900/50'
-          }`}>
-            
-            <div>
-                {/* Header Competencia */}
-                <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg border ${
+          {/* CARD 2: COMPETENCIA (DETECTADO) - clicable si hay link */}
+          {(() => {
+            const competitorLink = result.data.competitor?.link;
+            const cardClass = `rounded-3xl p-8 border relative overflow-hidden flex flex-col justify-between h-full transition-colors duration-500 ${
+              !result.data.avante.found ? 'bg-slate-900 border-slate-700' :
+              result.data.competitor.price < result.data.avante.price 
+                ? 'bg-red-950/20 border-red-900/50' 
+                : 'bg-green-950/20 border-green-900/50'
+            } ${competitorLink ? 'cursor-pointer hover:ring-2 hover:ring-blue-500/50 hover:border-blue-500/30' : ''}`;
+            const content = (
+              <>
+                <div>
+                  {/* Header Competencia */}
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg border ${
                         !result.data.avante.found ? 'bg-slate-800 border-slate-700 text-slate-400' :
                         result.data.competitor.price < result.data.avante.price 
-                            ? 'bg-red-900/30 border-red-900/50 text-red-400' 
-                            : 'bg-green-900/30 border-green-900/50 text-green-400'
-                    }`}>
-                    {!result.data.avante.found ? <Search size={24}/> :
-                     result.data.competitor.price < result.data.avante.price ? <TrendingDown size={24}/> : <TrendingUp size={24}/>}
+                          ? 'bg-red-900/30 border-red-900/50 text-red-400' 
+                          : 'bg-green-900/30 border-green-900/50 text-green-400'
+                      }`}>
+                        {!result.data.avante.found ? <Search size={24}/> :
+                         result.data.competitor.price < result.data.avante.price ? <TrendingDown size={24}/> : <TrendingUp size={24}/>}
+                      </div>
+                      <div>
+                        <h3 className="text-slate-200 font-medium">Mejor Oferta Externa</h3>
+                        <div className="text-xs text-slate-500 mt-1 uppercase tracking-wide">{result.data.competitor.vendor}</div>
+                      </div>
                     </div>
-                    <div>
-                    <h3 className="text-slate-200 font-medium">Mejor Oferta Externa</h3>
-                    <div className="text-xs text-slate-500 mt-1 uppercase tracking-wide">{result.data.competitor.vendor}</div>
-                    </div>
-                </div>
-                </div>
+                  </div>
 
-                {/* Precio Competencia */}
-                <div className="text-5xl font-bold text-white mb-6 tracking-tight">
-                ${result.data.competitor.price.toLocaleString()}
-                </div>
+                  {/* Precio Competencia */}
+                  <div className="text-5xl font-bold text-white mb-6 tracking-tight">
+                    ${result.data.competitor.price.toLocaleString()}
+                  </div>
 
-                {/* Análisis / Insights */}
-                {result.data.avante.found && (
+                  {/* Análisis / Insights */}
+                  {result.data.avante.found && (
                     <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800/50 backdrop-blur-sm">
-                    <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3">
                         {result.data.competitor.price < result.data.avante.price ? (
-                        <>
+                          <>
                             <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                             <div>
-                            <p className="text-red-200 font-medium text-sm">Alerta de Competitividad</p>
-                            <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                              <p className="text-red-200 font-medium text-sm">Alerta de Competitividad</p>
+                              <p className="text-slate-400 text-xs mt-1 leading-relaxed">
                                 El mercado está <strong>${(result.data.avante.price - result.data.competitor.price).toLocaleString()}</strong> más bajo.
-                            </p>
+                              </p>
                             </div>
-                        </>
+                          </>
                         ) : (
-                        <>
+                          <>
                             <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
                             <div>
-                            <p className="text-green-200 font-medium text-sm">Precio Dominante</p>
-                            <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                              <p className="text-green-200 font-medium text-sm">Precio Dominante</p>
+                              <p className="text-slate-400 text-xs mt-1 leading-relaxed">
                                 Tienes el mejor precio por <strong>${(result.data.competitor.price - result.data.avante.price).toLocaleString()}</strong>.
-                            </p>
+                              </p>
                             </div>
-                        </>
+                          </>
                         )}
+                      </div>
                     </div>
-                    </div>
-                )}
-            </div>
-            
-            <div className="mt-6 text-[10px] text-slate-600 font-mono border-t border-slate-800/50 pt-4 truncate">
-              Match: {result.data.competitor.title}
-            </div>
+                  )}
+                </div>
 
-          </div>
+                <div className="mt-6 text-[10px] text-slate-600 font-mono border-t border-slate-800/50 pt-4 truncate flex items-center justify-between gap-2">
+                  <span>Match: {result.data.competitor.title}</span>
+                  {competitorLink && (
+                    <span className="text-blue-400 shrink-0 flex items-center gap-1">
+                      Ver producto <Globe size={10} />
+                    </span>
+                  )}
+                </div>
+              </>
+            );
+            return competitorLink ? (
+              <a href={competitorLink} target="_blank" rel="noopener noreferrer" className={cardClass}>
+                {content}
+              </a>
+            ) : (
+              <div className={cardClass}>{content}</div>
+            );
+          })()}
         </div>
       )}
     </main>
