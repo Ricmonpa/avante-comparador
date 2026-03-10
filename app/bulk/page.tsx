@@ -6,29 +6,7 @@ import Link from 'next/link';
 import BulkResultsTable from '../../components/BulkResultsTable';
 import ProgressBar from '../../components/ProgressBar';
 
-interface AnalysisResult {
-  sku: string;
-  brand: string;
-  model: string;
-  size: string;
-  yourPrice: number;
-  bestCompetitorPrice: number;
-  competitorVendor: string;
-  difference: number;
-  status: 'overpriced' | 'competitive' | 'underpriced' | 'error';
-  recommendation: string;
-  competitorUrl: string;
-  error?: string;
-}
-
-interface UploadResult {
-  success: boolean;
-  total: number;
-  analysis: AnalysisResult[];
-  analysisSuccess: boolean;
-  headerRowDetected: number;
-  analysisError?: string;
-}
+import type { AnalysisResult, UploadResult } from '../../types';
 
 export default function BulkUploadPage() {
   const [file, setFile] = useState<File | null>(null);

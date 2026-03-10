@@ -1,22 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { ExternalLink, TrendingDown, TrendingUp, Minus, AlertTriangle } from 'lucide-react';
-
-interface AnalysisResult {
-  sku: string;
-  brand: string;
-  model: string;
-  size: string;
-  yourPrice: number;
-  bestCompetitorPrice: number;
-  competitorVendor: string;
-  difference: number;
-  status: 'overpriced' | 'competitive' | 'underpriced' | 'error';
-  recommendation: string;
-  competitorUrl: string;
-  error?: string;
-}
+import * as XLSX from 'xlsx';
+import { ExternalLink, TrendingDown, TrendingUp, Minus, AlertTriangle, Download } from 'lucide-react';
+import type { AnalysisResult } from '../types';
 
 interface BulkResultsTableProps {
   results: AnalysisResult[];
@@ -25,58 +12,94 @@ interface BulkResultsTableProps {
 
 export default function BulkResultsTable({ results, totalProcessed }: BulkResultsTableProps) {
   const [filter, setFilter] = useState<'all' | 'overpriced' | 'competitive' | 'underpriced'>('all');
+  const [vehicleFilter, setVehicleFilter] = useState<string>('all');
+
+  // Tipos de vehículo únicos presentes en los resultados
+  const vehicleTypes = ['all', ...Array.from(new Set(
+    results.map(r => r.vehicleType).filter(Boolean)
+  )) as string[]];
 
   const filteredResults = results.filter(result => {
-    if (filter === 'all') return true;
-    return result.status === filter;
+    const statusMatch = filter === 'all' || result.status === filter;
+    const vehicleMatch = vehicleFilter === 'all' || result.vehicleType === vehicleFilter;
+    return statusMatch && vehicleMatch;
   });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'overpriced': return <TrendingDown className="w-4 h-4 text-red-500" />;
+      case 'overpriced':  return <TrendingDown className="w-4 h-4 text-red-500" />;
       case 'underpriced': return <TrendingUp className="w-4 h-4 text-green-500" />;
       case 'competitive': return <Minus className="w-4 h-4 text-yellow-500" />;
-      case 'error': return <AlertTriangle className="w-4 h-4 text-gray-500" />;
-      default: return null;
+      case 'error':       return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+      default:            return null;
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'overpriced': return '🔴 Más caro';
+      case 'overpriced':  return '🔴 Más caro';
       case 'underpriced': return '🟢 Más barato';
       case 'competitive': return '✅ Competitivo';
-      case 'error': return '⚠️ Error';
-      default: return status;
+      case 'error':       return '⚠️ Error';
+      default:            return status;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'overpriced': return 'bg-red-950/30 border-red-900/50 text-red-400';
+      case 'overpriced':  return 'bg-red-950/30 border-red-900/50 text-red-400';
       case 'underpriced': return 'bg-green-950/30 border-green-900/50 text-green-400';
       case 'competitive': return 'bg-yellow-950/30 border-yellow-900/50 text-yellow-400';
-      case 'error': return 'bg-gray-950/30 border-gray-900/50 text-gray-400';
-      default: return 'bg-slate-950/30 border-slate-900/50 text-slate-400';
+      case 'error':       return 'bg-gray-950/30 border-gray-900/50 text-gray-400';
+      default:            return 'bg-slate-950/30 border-slate-900/50 text-slate-400';
     }
   };
 
   const exportToExcel = () => {
-    // Implementar exportación a Excel
-    console.log('Exportando a Excel...', results);
+    const rows = results.map(r => ({
+      SKU: r.sku,
+      Marca: r.brand,
+      Modelo: r.model,
+      Medida: r.size,
+      'Tipo Vehículo': r.vehicleType || '',
+      'Tu Precio ($)': r.yourPrice,
+      'Costo ($)': r.cost || '',
+      'Mejor Competencia ($)': r.bestCompetitorPrice,
+      'Vendedor Competencia': r.competitorVendor,
+      'Diferencia ($)': r.difference,
+      'Diferencia (%)': r.differencePercent != null
+        ? `${r.differencePercent.toFixed(1)}%`
+        : '',
+      Estado: getStatusText(r.status),
+      'Precio Sugerido ($)': r.suggestedPrice || '',
+      Recomendación: r.recommendation,
+      'Link Competencia': r.competitorLink || r.competitorUrl || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Ajustar anchos de columna automáticamente
+    const colWidths = Object.keys(rows[0] || {}).map(key => ({
+      wch: Math.max(key.length, 14)
+    }));
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Análisis Competencia');
+    XLSX.writeFile(wb, `avante-analisis-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const overpriced = results.filter(r => r.status === 'overpriced').length;
+  const overpriced  = results.filter(r => r.status === 'overpriced').length;
   const competitive = results.filter(r => r.status === 'competitive').length;
   const underpriced = results.filter(r => r.status === 'underpriced').length;
-  const errors = results.filter(r => r.status === 'error').length;
+  const errors      = results.filter(r => r.status === 'error').length;
 
   return (
     <div className="space-y-6">
-      
-      {/* Header con estadísticas */}
+
+      {/* Estadísticas */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold mb-4">📊 Análisis de Competencia</h2>
+        <h2 className="text-2xl font-bold mb-4">Análisis de Competencia</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div>
             <p className="text-slate-400">Total productos</p>
@@ -102,50 +125,41 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'all' 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
+      <div className="flex flex-wrap gap-3 items-center">
+        <button onClick={() => setFilter('all')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
           Todos ({results.length})
         </button>
-        <button
-          onClick={() => setFilter('overpriced')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'overpriced' 
-              ? 'bg-red-600 text-white' 
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
+        <button onClick={() => setFilter('overpriced')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'overpriced' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
           🔴 Más caros ({overpriced})
         </button>
-        <button
-          onClick={() => setFilter('competitive')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'competitive' 
-              ? 'bg-yellow-600 text-white' 
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
+        <button onClick={() => setFilter('competitive')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'competitive' ? 'bg-yellow-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
           ✅ Competitivos ({competitive})
         </button>
-        <button
-          onClick={() => setFilter('underpriced')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'underpriced' 
-              ? 'bg-green-600 text-white' 
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
+        <button onClick={() => setFilter('underpriced')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'underpriced' ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
           🟢 Más baratos ({underpriced})
         </button>
+
+        {/* Filtro por tipo de vehículo */}
+        {vehicleTypes.length > 1 && (
+          <select
+            value={vehicleFilter}
+            onChange={e => setVehicleFilter(e.target.value)}
+            className="ml-auto px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {vehicleTypes.map(vt => (
+              <option key={vt} value={vt}>
+                {vt === 'all' ? 'Todos los vehículos' : vt}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {/* Tabla de resultados */}
+      {/* Tabla */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -156,6 +170,7 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
                 <th className="text-left py-4 px-4 font-semibold text-slate-300">Tu Precio</th>
                 <th className="text-left py-4 px-4 font-semibold text-slate-300">Mejor Competencia</th>
                 <th className="text-left py-4 px-4 font-semibold text-slate-300">Diferencia</th>
+                <th className="text-left py-4 px-4 font-semibold text-slate-300">Precio Sugerido</th>
                 <th className="text-left py-4 px-4 font-semibold text-slate-300">Estado</th>
                 <th className="text-left py-4 px-4 font-semibold text-slate-300">Acción</th>
               </tr>
@@ -168,6 +183,9 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
                     <div>
                       <p className="font-medium">{result.brand} {result.model}</p>
                       <p className="text-slate-400 text-xs">{result.size}</p>
+                      {result.vehicleType && (
+                        <p className="text-slate-600 text-xs mt-0.5">{result.vehicleType}</p>
+                      )}
                     </div>
                   </td>
                   <td className="py-4 px-4 font-semibold">
@@ -185,11 +203,36 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
                   </td>
                   <td className="py-4 px-4">
                     {result.status !== 'error' && (
-                      <span className={`font-semibold ${
-                        result.difference > 0 ? 'text-red-400' : result.difference < 0 ? 'text-green-400' : 'text-yellow-400'
-                      }`}>
-                        {result.difference > 0 ? '-' : '+'}${Math.abs(result.difference).toLocaleString()}
-                      </span>
+                      <div>
+                        <span className={`font-semibold block ${
+                          result.difference > 0 ? 'text-red-400' : result.difference < 0 ? 'text-green-400' : 'text-yellow-400'
+                        }`}>
+                          {result.difference > 0 ? '-' : '+'}${Math.abs(result.difference).toLocaleString()}
+                        </span>
+                        {result.differencePercent != null && (
+                          <span className={`text-xs ${
+                            result.differencePercent > 0 ? 'text-red-500' : result.differencePercent < 0 ? 'text-green-500' : 'text-yellow-500'
+                          }`}>
+                            {result.differencePercent > 0 ? '+' : ''}{result.differencePercent.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-4 px-4">
+                    {result.suggestedPrice ? (
+                      <div>
+                        <span className="font-semibold text-blue-400">
+                          ${result.suggestedPrice.toLocaleString()}
+                        </span>
+                        {result.cost && (
+                          <p className="text-slate-500 text-xs mt-0.5">
+                            Margen: {(((result.suggestedPrice - result.cost) / result.suggestedPrice) * 100).toFixed(1)}%
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-600 text-xs">—</span>
                     )}
                   </td>
                   <td className="py-4 px-4">
@@ -201,12 +244,12 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
                   <td className="py-4 px-4">
                     {result.status !== 'error' && (
                       <a
-                        href={result.competitorUrl}
+                        href={result.competitorLink || result.competitorUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors text-xs"
                       >
-                        Ver en Google
+                        {result.competitorLink ? 'Ver producto' : 'Ver en Google'}
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
@@ -218,19 +261,20 @@ export default function BulkResultsTable({ results, totalProcessed }: BulkResult
         </div>
       </div>
 
-      {/* Botones de acción */}
+      {/* Botones */}
       <div className="flex gap-4">
         <button
           onClick={exportToExcel}
-          className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-medium transition-colors"
         >
-          📊 Exportar resultados a Excel
+          <Download className="w-4 h-4" />
+          Exportar resultados a Excel
         </button>
         <button
           onClick={() => window.location.reload()}
           className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
         >
-          🔄 Cargar otro archivo
+          Cargar otro archivo
         </button>
       </div>
     </div>
