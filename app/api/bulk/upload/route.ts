@@ -1,189 +1,184 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import InventoryStore from '../../../../lib/inventory-store';
-
-// Aumentar timeout en Vercel Pro (máx 300s) para inventarios grandes
-export const maxDuration = 300;
 
 // Función para detectar la fila de headers automáticamente
 function findHeaderRow(worksheet: XLSX.WorkSheet): number {
   const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-  const headerKeywords = ['sku', 'marca', 'modelo', 'medida'];
-  
-  // Buscar en las primeras 10 filas
+  // Palabras clave que identifican la fila de encabezados
+  const mustHave = ['marca', 'medida'];
+  const optional = ['sku', 'modelo', 'precio', 'costo', 'neto', 'descripcion'];
+
   for (let row = range.s.r; row <= Math.min(range.e.r, 9); row++) {
     const cellsInRow: string[] = [];
-    
-    // Leer todas las columnas de esta fila
+
     for (let col = range.s.c; col <= range.e.c; col++) {
       const addr = XLSX.utils.encode_cell({ r: row, c: col });
       const cell = worksheet[addr];
-      if (cell?.v) {
-        cellsInRow.push(String(cell.v).toLowerCase());
-      }
+      if (cell?.v) cellsInRow.push(String(cell.v).toLowerCase().trim());
     }
-    
-    // Debe encontrar AL MENOS 3 de las 4 keywords
-    const matchCount = headerKeywords.filter(kw => 
-      cellsInRow.some(cell => cell.includes(kw))
-    ).length;
-    
-    if (matchCount >= 3) {
+
+    // Debe tener al menos las 2 palabras clave obligatorias
+    const hasMust = mustHave.every(kw => cellsInRow.some(c => c.includes(kw)));
+    if (hasMust) {
       console.log(`✅ Headers encontrados en fila ${row + 1}:`, cellsInRow);
       return row;
     }
+
+    // O al menos 3 de las opcionales
+    const optionalCount = optional.filter(kw => cellsInRow.some(c => c.includes(kw))).length;
+    if (optionalCount >= 3) {
+      console.log(`✅ Headers detectados (${optionalCount} palabras) en fila ${row + 1}:`, cellsInRow);
+      return row;
+    }
   }
-  
+
   console.log('⚠️ Headers no encontrados, usando fila 0');
   return 0;
 }
 
-// Función para normalizar nombres de columnas (ACTUALIZADA)
+// Mapeo de nombres de columnas a campos estándar
 function normalizeColumnName(col: string): string {
-  const normalized = col.toLowerCase().trim().replace(/\s+/g, '_').replace(/[()$]/g, '');
-  
-  // Mapeo de columnas del Excel maestro de Llantas Avante
+  const normalized = col
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[()$áéíóúüñ]/g, c =>
+      ({ á: 'a', é: 'e', í: 'i', ó: 'o', ú: 'u', ü: 'u', ñ: 'n' }[c] ?? '')
+    );
+
   const mappings: Record<string, string> = {
-    // Mapeos originales
-    'costo_promedio': 'price',
-    'costo': 'cost',
-    'precio': 'price',
-    'medida': 'size',
-    'modelo': 'model',
+    // Identificadores
+    'sku': 'sku',
+    'codigo': 'sku',
+    'clave': 'sku',
+    'id': 'sku',
+
+    // Marca / Modelo / Medida
     'marca': 'brand',
-    
-    // Mapeos específicos del Excel maestro
-    'precio_de_venta_': 'price',
+    'modelo': 'model',
+    'medida': 'size',
+    'descripcion': 'model',
+    'description': 'model',
+
+    // Precios
+    'precio': 'price',
     'precio_de_venta': 'price',
-    'costo_de_adquisición_': 'cost',
-    'costo_de_adquisicion_': 'cost',
-    'costo_de_adquisición': 'cost',
+    'precio_de_venta_': 'price',
+    'pvp': 'price',
+    'neto': 'price',           // ← Excel de Avante usa "Neto"
+
+    // Costo
+    'costo': 'cost',
+    'costo_promedio': 'cost',
     'costo_de_adquisicion': 'cost',
+    'costo_de_adquisicion_': 'cost',
+
+    // Stock
+    'stock': 'stock',
     'stock_total': 'stock',
-    'precio_competencia_': 'competitorPrice',
-    'precio_competencia': 'competitorPrice',
-    'margen_de_contribución_': 'margin',
-    'margen_de_contribucion_': 'margin',
-    'margen_de_contribución': 'margin',
+    'existencias': 'stock',
+    'inventario': 'stock',
+
+    // Margen
+    'margen': 'margin',
     'margen_de_contribucion': 'margin',
-    'tipo_de_vehículo': 'vehicleType',
+    'margen_de_contribucion_': 'margin',
+
+    // Tipo de vehículo
     'tipo_de_vehiculo': 'vehicleType',
+    'tipo': 'vehicleType',
+    'clase': 'clase',  // campo informativo, no se usa en análisis
   };
-  
-  return mappings[normalized] || normalized;
+
+  return mappings[normalized] ?? normalized;
 }
 
-// Función para normalizar un objeto completo
-function normalizeProduct(product: any) {
-  const normalized: any = {};
-  
-  for (const [key, value] of Object.entries(product)) {
-    if (value !== null && value !== undefined && value !== '') {
-      const normalizedKey = normalizeColumnName(key);
-      normalized[normalizedKey] = value;
+function normalizeProduct(raw: any, index: number) {
+  const out: any = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      const k = normalizeColumnName(key);
+      out[k] = value;
     }
   }
-  
-  return normalized;
+
+  // Convertir precio y costo a número si vienen como string
+  if (out.price && typeof out.price === 'string') {
+    out.price = parseFloat(out.price.replace(/[,$]/g, '')) || 0;
+  }
+  if (out.cost && typeof out.cost === 'string') {
+    out.cost = parseFloat(out.cost.replace(/[,$]/g, '')) || 0;
+  }
+
+  // Auto-generar SKU si no existe
+  if (!out.sku) {
+    const brand = String(out.brand || '').slice(0, 3).toUpperCase();
+    const size = String(out.size || '').replace(/[^0-9R]/gi, '');
+    out.sku = `${brand}-${size}-${String(index + 1).padStart(3, '0')}`;
+  }
+
+  return out;
 }
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    
+
     if (!file) {
       return NextResponse.json({ error: 'No se recibió ningún archivo' }, { status: 400 });
     }
 
-    // Convertir el archivo a buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Leer el Excel
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    
-    // Detectar automáticamente la fila de headers
+
     const headerRow = findHeaderRow(worksheet);
-    
-    // Convertir a JSON empezando desde la fila de headers detectada
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { 
+
+    const rawData = XLSX.utils.sheet_to_json(worksheet, {
       range: headerRow,
-      defval: '' // Valor por defecto para celdas vacías
-    });
-    
+      defval: '',
+    }) as any[];
+
     if (!rawData || rawData.length === 0) {
-      return NextResponse.json({ error: 'El archivo está vacío o no contiene datos válidos' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'El archivo está vacío o no contiene datos válidos' },
+        { status: 400 }
+      );
     }
 
-    // Filtrar filas vacías y normalizar productos
-    const validData = rawData.filter((row: any) => {
-      // Verificar que la fila tenga al menos un campo con datos
-      return Object.values(row).some(value => value && value.toString().trim() !== '');
+    // Filtrar filas completamente vacías
+    const validData = rawData.filter(row =>
+      Object.values(row).some(v => v && String(v).trim() !== '')
+    );
+
+    const products = validData.map((row, i) => normalizeProduct(row, i));
+
+    // Filtrar productos sin precio ni marca (inútiles para análisis)
+    const usable = products.filter(p => p.brand || p.size);
+
+    console.log(`📦 Excel procesado: ${usable.length} productos útiles de ${rawData.length} filas`);
+    console.log(`📋 Columnas originales:`, Object.keys(rawData[0]));
+    console.log(`✅ Columnas normalizadas:`, Object.keys(products[0] || {}));
+
+    // Devolver solo los productos; el análisis lo hace el cliente
+    return NextResponse.json({
+      success: true,
+      total: usable.length,
+      products: usable,
+      originalColumns: Object.keys(rawData[0]),
+      normalizedColumns: Object.keys(products[0] || {}),
+      headerRowDetected: headerRow + 1,
     });
-
-    const normalizedData = validData.map(normalizeProduct);
-
-    // Cargar datos en el store de inventario
-    const inventoryStore = InventoryStore.getInstance();
-    inventoryStore.loadInventory(normalizedData);
-
-    console.log(`📦 Procesados ${normalizedData.length} productos del Excel`);
-    console.log(`📋 Columnas detectadas:`, Object.keys(rawData[0] as object));
-    console.log(`✅ Columnas normalizadas:`, Object.keys(normalizedData[0]));
-
-    // Llamar al análisis automático
-    console.log(`🚀 Iniciando análisis masivo automático...`);
-    
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-      const analyzeResponse = await fetch(`${baseUrl}/api/bulk/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: normalizedData })
-      });
-      
-      const analysisResults = await analyzeResponse.json();
-      
-      return NextResponse.json({
-        success: true,
-        total: normalizedData.length,
-        preview: normalizedData.slice(0, 5),
-        data: normalizedData,
-        originalColumns: Object.keys(rawData[0] as object),
-        normalizedColumns: Object.keys(normalizedData[0]),
-        headerRowDetected: headerRow + 1,
-        inventoryLoaded: true,
-        analysis: analysisResults.results || [],
-        analysisSuccess: analysisResults.success
-      });
-      
-    } catch (analysisError) {
-      console.error('Error en análisis automático:', analysisError);
-      
-      // Si falla el análisis, devolver datos básicos
-      return NextResponse.json({
-        success: true,
-        total: normalizedData.length,
-        preview: normalizedData.slice(0, 5),
-        data: normalizedData,
-        originalColumns: Object.keys(rawData[0] as object),
-        normalizedColumns: Object.keys(normalizedData[0]),
-        headerRowDetected: headerRow + 1,
-        inventoryLoaded: true,
-        analysis: [],
-        analysisSuccess: false,
-        analysisError: 'Error en análisis automático'
-      });
-    }
-
   } catch (error) {
     console.error('Error procesando Excel:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Error al procesar el archivo Excel'
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Error al procesar el archivo Excel' },
+      { status: 500 }
+    );
   }
 }

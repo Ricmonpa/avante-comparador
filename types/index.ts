@@ -51,8 +51,9 @@ export interface PriceHistoryEntry {
 export interface UploadResult {
   success: boolean;
   total: number;
-  analysis: AnalysisResult[];
-  analysisSuccess: boolean;
+  /** Lista de productos normalizados del Excel (análisis se hace en cliente) */
+  products: any[];
   headerRowDetected: number;
-  analysisError?: string;
+  originalColumns: string[];
+  normalizedColumns: string[];
 }
