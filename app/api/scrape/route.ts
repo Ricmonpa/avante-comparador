@@ -87,20 +87,26 @@ export async function GET(request: Request) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `
-      Eres un experto en el mercado de llantas en México.
+      Eres un experto en el mercado de llantas/neumáticos en México.
       Analiza la siguiente lista de productos de Google Shopping para la búsqueda: "${query}".
 
       Lista de productos: ${JSON.stringify(allResults.slice(0, 10))}
 
+      REGLAS CRÍTICAS:
+      - SOLO considera resultados que sean LLANTAS o NEUMÁTICOS reales.
+      - Si un resultado no es una llanta (por ejemplo, accesorios, cajas, herramientas, ropa u otros productos), IGNÓRALO COMPLETAMENTE.
+      - Un precio de llanta real en México está típicamente entre $600 y $15,000 MXN. Precios fuera de ese rango son sospechosos.
+      - Si no encuentras ningún resultado que sea claramente una llanta, devuelve "competitors" como array vacío [].
+
       Tu tarea:
       1. Identifica el producto de "Grupo Avante" o "Avante" (si existe).
-      2. Identifica los 3 mejores competidores (los más baratos que NO sean Avante), ordenados de menor a mayor precio.
+      2. De los resultados que SÍ sean llantas, identifica los 3 mejores competidores (los más baratos que NO sean Avante), ordenados de menor a mayor precio.
       3. Extrae las medidas de la llanta (ej: 205/55 R16).
       4. Para cada competidor, incluye el campo "link" exactamente como viene en la lista.
 
       Responde ÚNICAMENTE en formato JSON con esta estructura:
       {
-        "specs": "medida encontrada",
+        "specs": "medida encontrada o null",
         "avante": {"found": true/false, "price": número, "title": "título"},
         "competitors": [
           {"vendor": "nombre tienda", "price": número, "title": "título", "link": "url o null"},

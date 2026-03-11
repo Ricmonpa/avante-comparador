@@ -57,8 +57,10 @@ function normalizeColumnName(col: string): string {
     'marca': 'brand',
     'modelo': 'model',
     'medida': 'size',
-    'descripcion': 'model',
-    'description': 'model',
+    // DESCRIPCION va como campo informativo, no se usa en la query de búsqueda
+    // (contiene la descripción completa con SKU numérico que confunde a Google)
+    'descripcion': 'description',
+    'description': 'description',
 
     // Precios
     'precio': 'price',

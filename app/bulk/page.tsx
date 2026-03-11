@@ -145,10 +145,12 @@ export default function BulkUploadPage() {
       setProgress({ current: 0, total: products.length });
 
       // ── Fase 2: deduplicar queries para no llamar la API dos veces ───────
-      // Agrupamos por "MARCA MEDIDA" (query de búsqueda)
+      // La query es SOLO "MARCA MEDIDA" — la DESCRIPCION tiene SKUs numéricos
+      // que confunden a Google Shopping y arruinan los resultados.
+      // Así 174 productos colapsan a ~20-30 queries únicas.
       const queryGroups = new Map<string, number[]>(); // query → índices de productos
       products.forEach((p, i) => {
-        const q = [p.brand, p.model, p.size]
+        const q = [p.brand, p.size]
           .filter(v => v && String(v).trim() !== '')
           .join(' ')
           .trim()
@@ -158,6 +160,9 @@ export default function BulkUploadPage() {
       });
 
       const uniqueQueries = Array.from(queryGroups.entries()); // [query, indices[]]
+      console.log(`🔢 ${products.length} productos → ${uniqueQueries.length} queries únicas (deduplicadas)`);
+      // Actualizar total para que el progress bar cuente bien
+      setProgress({ current: 0, total: products.length });
       const accumulated: AnalysisResult[] = new Array(products.length);
       let processedCount = 0;
 
