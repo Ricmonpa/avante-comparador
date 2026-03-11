@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import InventoryStore from '../../../../lib/inventory-store';
 
+// Aumentar timeout en Vercel Pro (máx 300s) para inventarios grandes
+export const maxDuration = 300;
+
 // Función para detectar la fila de headers automáticamente
 function findHeaderRow(worksheet: XLSX.WorkSheet): number {
   const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');

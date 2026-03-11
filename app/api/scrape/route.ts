@@ -7,14 +7,24 @@ import type { CompetitorInfo, PriceHistoryEntry } from '../../../types';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// Retry con backoff exponencial
-async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+// Extrae el tiempo de espera real del error 429 de Gemini ("Please retry in 12s")
+function extractRetryDelay(error: any): number {
+  const msg = String(error?.message || error || '');
+  const match = msg.match(/retry in (\d+)s/i);
+  return match ? parseInt(match[1], 10) * 1000 + 1000 : 20000; // +1s buffer
+}
+
+// Retry con backoff exponencial; para 429 respeta el tiempo indicado por Gemini
+async function withRetry<T>(fn: () => Promise<T>, retries = 4): Promise<T> {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
-    } catch (e) {
+    } catch (e: any) {
       if (i === retries - 1) throw e;
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+      const is429 = String(e?.message || e).includes('429');
+      const delay = is429 ? extractRetryDelay(e) : 1000 * Math.pow(2, i);
+      console.log(`⏳ Retry ${i + 1}/${retries - 1} en ${Math.round(delay / 1000)}s${is429 ? ' (rate limit Gemini)' : ''}`);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
   throw new Error('Max retries reached');

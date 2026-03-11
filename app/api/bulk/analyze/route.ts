@@ -1,21 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { AnalysisResult, CompetitorInfo } from '../../../../types';
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+// Aumentar timeout en Vercel Pro para inventarios grandes
+export const maxDuration = 300;
+
+// Extrae el tiempo de espera real del error 429 de Gemini ("retry in 12s")
+function extractRetryDelay(error: any): number {
+  const msg = String(error?.message || error || '');
+  const match = msg.match(/retry in (\d+)s/i);
+  return match ? parseInt(match[1], 10) * 1000 + 1000 : 20000; // +1s de buffer
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 4): Promise<T> {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
-    } catch (e) {
+    } catch (e: any) {
       if (i === retries - 1) throw e;
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+      // Para 429 (rate limit), respetar el tiempo que indica la API
+      const is429 = String(e?.message || e).includes('429');
+      const delay = is429 ? extractRetryDelay(e) : 1000 * Math.pow(2, i);
+      console.log(`⏳ Retry ${i + 1}/${retries - 1} en ${Math.round(delay / 1000)}s${is429 ? ' (rate limit)' : ''}`);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
   throw new Error('Max retries reached');
 }
 
-async function processBatch(products: any[], batchSize: number = 5) {
+// Procesamos de a 2 productos en paralelo para no saturar el rate limit de Gemini.
+// Entre cada tanda esperamos 3s para que la cuota se recupere.
+async function processBatch(products: any[], batchSize: number = 2) {
   const results: AnalysisResult[] = [];
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const BATCH_DELAY_MS = 3000; // pausa entre tandas
 
   for (let i = 0; i < products.length; i += batchSize) {
     const batch = products.slice(i, i + batchSize);
@@ -23,7 +40,35 @@ async function processBatch(products: any[], batchSize: number = 5) {
     const batchResults = await Promise.all(
       batch.map(async (product): Promise<AnalysisResult> => {
         try {
-          const query = `${product.brand} ${product.model} ${product.size}`;
+          // Filtrar undefined/null para no generar queries como "BRAND undefined SIZE"
+          const query = [product.brand, product.model, product.size]
+            .filter(v => v !== undefined && v !== null && String(v).trim() !== '')
+            .join(' ')
+            .trim();
+
+          if (!query) {
+            return {
+              sku: product.sku,
+              brand: product.brand,
+              model: product.model,
+              size: product.size,
+              vehicleType: product.vehicleType,
+              yourPrice: product.price,
+              cost: product.cost,
+              margin: product.margin,
+              bestCompetitorPrice: 0,
+              competitorVendor: '',
+              competitors: [],
+              difference: 0,
+              differencePercent: 0,
+              status: 'error' as const,
+              recommendation: 'Faltan datos (marca/medida)',
+              competitorUrl: '',
+              competitorLink: null,
+              error: 'Sin marca ni medida para buscar',
+            };
+          }
+
           const data = await withRetry(() =>
             fetch(`${baseUrl}/api/scrape?q=${encodeURIComponent(query)}`).then(r => r.json())
           );
@@ -130,6 +175,11 @@ async function processBatch(products: any[], batchSize: number = 5) {
 
     results.push(...batchResults);
     console.log(`📊 Procesados ${results.length}/${products.length} productos`);
+
+    // Pausa entre tandas para respetar el rate limit de Gemini
+    if (i + batchSize < products.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    }
   }
 
   return results;
